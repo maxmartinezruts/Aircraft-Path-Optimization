@@ -30,9 +30,14 @@ def heuristic_cost_estimate_neighbour(st, en):
 
 
 def get_pos_by_coor(coor):
-    return np.array([xx[coor[0], coor[1]], yy[coor[0], coor[1]]])
+    return np.array([xValues[coor[0]], yValues[coor[1]]])
 
+def get_coor_by_pos(pos):
+    x =int(round((pos[0]-(-8))/(8-(-8))*((n-1))))
+    y =int(round((pos[1]-(-8))/(8-(-8))*((n-1))))
+    coor = np.array([x,y], dtype=int)
 
+    return coor
 
 class Node:
     def __init__(self, coor, parent):
@@ -43,21 +48,30 @@ class Node:
         self.parent = None
 
     def get_neighbors(self):
+
+        if self.parent == None:
+            angles = np.linspace(0,2*math.pi,400)
+            v3 = np.array([0,0.3])
+        else:
+            angles =np.linspace(-0.2,0.2,20)
+            v3 = self.pos - self.parent.pos
+
         neightbours = []
-        for i in range(-m,m+1):
-            for j in range(-m,m+1):
-                neighbourCoor = np.array(self.coor+np.array([i,j]),dtype=int)
-                if not(i==0 and j==0) and 0 <=neighbourCoor[0] <n and 0<= neighbourCoor[1] <n:
 
-                    if ( graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]] == 0):
-                        node =graph.add_node(neighbourCoor, self)
-                    else:
-                        node = graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]]
+        for angle in angles:
+            R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+            v3rot = np.matmul(R,v3)
+            neighbourPos = self.pos + v3rot
 
-                    neightbours.append(node)
+            neighbourCoor = get_coor_by_pos(neighbourPos)
+            if 0 <neighbourCoor[0] <n and 0<neighbourCoor[1]<n:
+                if ( graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]] == 0):
+                    node =graph.add_node(neighbourCoor, self)
+                else:
+                    node = graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]]
+
+                neightbours.append(node)
         return  neightbours
-
-
 
 
 class Graph:
@@ -124,6 +138,8 @@ class Graph:
 
         return node
     def reconstruct_path(self, start, end, color, w):
+        pygame.event.get()
+
         path = []
         current = end
         while current.parent != None:
@@ -155,7 +171,7 @@ fpsClock = pygame.time.Clock()
 
 
 fps = 40
-n = 400
+n = 150
 m =10
 # Construct grid
 weights = np.ones((n,n))*1
@@ -167,8 +183,11 @@ print(np.mean(weights))
 xValues = np.linspace(-8,8,n)
 yValues = np.linspace(-8,8,n)
 xx,yy = np.meshgrid(xValues, yValues)
-
-
+for x in range(n):
+    for y in range(n):
+        weights[x,y] =abs(math.cos(get_pos_by_coor(np.array([x,0]))[0])+math.sin(get_pos_by_coor(np.array([0,y]))[1]))+1
+        # if 3/8*n < x < 5/8*n and 3/8*n < y < 5/8*n:
+        #     weights[x, y] = 2
 
 # Game loop
 while True:
@@ -177,8 +196,9 @@ while True:
 
     screen.fill((0, 0, 0))
     #
-                # weights[x,y]=2
-            # pygame.draw.circle(screen, red, cartesian_to_screen(get_pos_by_coor([x, y])), int(weights[x, y]*1))
+    for x in range(n):
+        for y in range(n):
+            pygame.draw.circle(screen, red, cartesian_to_screen(get_pos_by_coor([x, y])), int(weights[x, y]*2))
     mean_weights = np.mean(weights)
 
     graph = Graph()
@@ -189,7 +209,7 @@ while True:
     stcor = np.array([random.randint(0,n-1),random.randint(0,n-1)],dtype=int)
 
     end = graph.add_node(stcor, None)
-    pygame.draw.circle(screen, yellow, cartesian_to_screen(start.pos), 10)
+    pygame.draw.circle(screen, red, cartesian_to_screen(start.pos), 10)
     pygame.draw.circle(screen, yellow, cartesian_to_screen(end.pos), 10)
     graph.prepare(start, end)
     graph.search()
