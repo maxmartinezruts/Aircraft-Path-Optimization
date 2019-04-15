@@ -50,7 +50,7 @@ class Node:
     def get_neighbors(self):
 
         if self.parent == None:
-            angles = np.linspace(0,2*math.pi,400)
+            angles = np.linspace(0,0*2*math.pi,400)
             v3 = np.array([0,0.3])
         else:
             angles =np.linspace(-0.2,0.2,20)
@@ -171,8 +171,8 @@ fpsClock = pygame.time.Clock()
 
 
 fps = 40
-n = 150
-m =10
+n = 300
+m =1000
 # Construct grid
 weights = np.ones((n,n))*1
 # weights += np.random.rand(n,n)*2
@@ -185,15 +185,12 @@ yValues = np.linspace(-8,8,n)
 xx,yy = np.meshgrid(xValues, yValues)
 for x in range(n):
     for y in range(n):
-        weights[x,y] =abs(math.cos(get_pos_by_coor(np.array([x,0]))[0])+math.sin(get_pos_by_coor(np.array([0,y]))[1]))+1
+        weights[x,y] =abs(math.cos(get_pos_by_coor(np.array([x,0]))[0])+math.sin(get_pos_by_coor(np.array([0,y]))[1]))/4+1
         # if 3/8*n < x < 5/8*n and 3/8*n < y < 5/8*n:
         #     weights[x, y] = 2
 
 # Game loop
 while True:
-
-
-
     screen.fill((0, 0, 0))
     #
     for x in range(n):
