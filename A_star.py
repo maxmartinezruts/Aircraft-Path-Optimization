@@ -22,73 +22,67 @@ def screen_to_cartesian(screen_pos):
     return car_pos
 
 def heuristic_cost_estimate(st, en):
-    rectilinear_distance = np.linalg.norm(st.car_pos - en.car_pos)
-    ang = math.acos((2 * r ** 2 - rectilinear_distance ** 2) / (2 * r ** 2))
-    circular_distance = r * ang
-    return  circular_distance
+    return  np.linalg.norm(st.pos - en.pos)
 
 def heuristic_cost_estimate_neighbour(st, en):
-    w = (weights[st.coor[0],st.coor[1]]+weights[en.coor[0],en.coor[1]])/2
-    rectilinear_distance = np.linalg.norm(st.car_pos - en.car_pos)
-    ang = math.acos((2 * r ** 2 - rectilinear_distance ** 2) / (2 * r ** 2))
-    circular_distance = r * ang
-    return  circular_distance*w
-
+    w = (weights[st.coor[0],st.coor[1],st.coor[2]]+weights[en.coor[0],en.coor[1],en.coor[2]])/2
+    return  np.linalg.norm(st.pos - en.pos)*w
 
 
 def get_pos_by_coor(coor):
-    return np.array([lonValues[coor[0]], latValues[coor[1]]])
-
-def spherical_to_cartesian(pos):
-    x = r*math.sin(pos[0])*math.cos(pos[1])
-    y = r*math.sin(pos[0])*math.sin(pos[1])
-    z = r*math.cos(pos[0])
-    return np.array([x,y,z])
-
+    return np.array([xValues[coor[0]], yValues[coor[1]], zValues[coor[2]]])
 
 def get_coor_by_pos(pos):
-    x =int(round((pos[0]-(0))/(1*math.pi-(0))*((n-1))))
-    y =int(round((pos[1]-(0))/(2*math.pi-(0))*((n-1))))
-    coor = np.array([x,y], dtype=int)
+    x =int(round((pos[0]-(-8))/(8-(-8))*((n-1))))
+    y =int(round((pos[1]-(-8))/(8-(-8))*((n-1))))
+    z =int(round((pos[2]-(0))/(10-(0))*((m-1))))
+
+    coor = np.array([x,y,z], dtype=int)
 
     return coor
 
 class Node:
     def __init__(self, coor, parent):
         self.coor = coor
-        self.pos =get_pos_by_coor(coor)
-        self.car_pos = spherical_to_cartesian(get_pos_by_coor(coor))
+        self.pos = get_pos_by_coor(coor)
         self.gScore = math.inf
         self.fScore = math.inf
         self.parent = None
 
     def get_neighbors(self):
+        if self.parent == None:
+            angles = np.linspace(0,0*2*math.pi,1)
+            v3 = np.array([0,0.3,0])
+        else:
+            angles =np.linspace(-0.2,0.2,4)
+            v3 = self.pos - self.parent.pos
+
         neightbours = []
-        for lon in np.linspace(-4,4,20):
-            for lat in np.linspace(-4,4,20):
-                neighbourCoor=self.coor+np.array([lon,lat],dtype=int)
-                if neighbourCoor[0] < 0:
-                    neighbourCoor[0]+=n
-                if neighbourCoor[0]>=n:
-                    neighbourCoor[0]-=n
-                if neighbourCoor[1] < 0:
-                    neighbourCoor[1]+=n
-                if neighbourCoor[1]>=n:
-                    neighbourCoor[1]-=n
-                if (graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]] == 0):
-                    node = graph.add_node(neighbourCoor, self)
-                else:
-                    node = graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]]
+
+        for angle in angles:
+            R = np.array([[np.cos(angle), -np.sin(angle), 0],
+                          [np.sin(angle), np.cos(angle), 0],
+                          [0,0,1]])
+            v3rot = np.matmul(R,v3)
+            neighbourPos = self.pos + v3rot
+
+            neighbourCoor = get_coor_by_pos(neighbourPos)
+            if 0 <neighbourCoor[0] <n and 0<neighbourCoor[1]<n:
+
+                node = graph.add_node(neighbourCoor, self)
 
                 neightbours.append(node)
+
+
         return  neightbours
 
 
 class Graph:
     def __init__(self):
-        self.all_pos = []
-        self.availableCoors = [[0 for j in range(n)] for i in range(n)]
-
+        self.all = []
+        self.availableCoors = [[[0 for j in range(n)] for i in range(n)] for k in range(z)]
+        self.availableCoors = np.zeros((n,n,m), dtype=Node)
+        print(self.availableCoors)
     def prepare(self, start, end):
         print('new')
         self.start = start
@@ -110,22 +104,26 @@ class Graph:
         while len(self.openSet) > 0:  # While not close enough to end
             minScore = math.inf
             for node in self.openSet:
+
+
                 if node.fScore < minScore:
                     minScore = node.fScore
                     current = node
+            # time.sleep(2)
             # current = the node in openSet having the lowest fScore[] value
-            self.reconstruct_path(self.start, current,False,1)
+            self.reconstruct_path(self.start, current,green,1)
             #print(current.pos)
-            if np.linalg.norm(current.car_pos-end.car_pos) <0.2:
+            if np.linalg.norm(current.pos - self.end.pos) <0.2:
                 print(current.parent)
 
-                return self.reconstruct_path(self.start, current,True,3)
+                return self.reconstruct_path(self.start, current,yellow,3)
 
             self.openSet.remove(current)
             self.closedSet.append(current)
             neighbors = current.get_neighbors()
-
+            print('--------', current.pos)
             for neighbor in neighbors:
+                # print(neighbor.pos)
                 if neighbor in self.closedSet:
                     continue  # Ignore the neighbor which is already evaluated.
 
@@ -143,11 +141,11 @@ class Graph:
 
     def add_node(self, coor, parent):
         node = Node(coor,parent)
-        self.availableCoors[coor[0]][coor[1]] = node
-        self.all_pos.append(get_pos_by_coor(coor))
+        self.availableCoors[coor[0],coor[1],coor[2]] = node
+        self.all.append(node)
 
         return node
-    def reconstruct_path(self, start, end, final, w):
+    def reconstruct_path(self, start, end, color, w):
         pygame.event.get()
 
         path = []
@@ -158,13 +156,7 @@ class Graph:
             path.append(current)
 
         for p in range(len(path)-1):
-            pos =spherical_to_cartesian(path[p].pos)
-            height =int((((pos[2]+8)*255))/32)+40
-            if not final:
-                color = (height,height,height)
-            else:
-                color = yellow
-            pygame.draw.line(screen, color, cartesian_to_screen(spherical_to_cartesian(path[p].pos)),cartesian_to_screen(spherical_to_cartesian(path[p+1].pos)), w)
+            pygame.draw.line(screen, color, cartesian_to_screen(path[p].pos),cartesian_to_screen(path[p+1].pos), w)
 
         pygame.display.flip()
 
@@ -185,26 +177,27 @@ yellow = (255,255, 0)
 
 fpsClock = pygame.time.Clock()
 
-r = 8
+
 fps = 40
-n = 400
-m =1000
+n = 300
+m =3
 # Construct grid
-weights = np.ones((n,n))*1
+weights = np.ones((n,n,m))*1
 # weights += np.random.rand(n,n)*2
 
 mean_weights =  np.mean(weights)
 print(np.mean(weights))
 # weights = np.random.rand(100,100)*5
-lonValues = np.linspace(0,math.pi,n)
-latValues = np.linspace(0,math.pi*2,n)
-xx,yy = np.meshgrid(latValues, lonValues)
+xValues = np.linspace(-8,8,n)
+yValues = np.linspace(-8,8,n)
+zValues = np.linspace(0,10,m)
+xx,yy = np.meshgrid(xValues, yValues)
 for x in range(n):
     for y in range(n):
-        weights[x,y] =1
-        # weights[x,y] =abs(math.sin(get_pos_by_coor(np.array([0,y]))[1]))/+1
-        # if 3/8*n < x < 5/8*n and 3/8*n < y < 5/8*n:
-        #     weights[x, y] = 2
+        for z in range(m):
+            weights[x,y,z] =abs(math.cos(get_pos_by_coor(np.array([x,0,0]))[0])+math.sin(get_pos_by_coor(np.array([0,y,0]))[1]))+1
+            # if 3/8*n < x < 5/8*n and 3/8*n < y < 5/8*n:
+            #     weights[x, y] = 2
 
 # Game loop
 while True:
@@ -212,18 +205,19 @@ while True:
     #
     for x in range(n):
         for y in range(n):
-            pygame.draw.circle(screen, red, cartesian_to_screen(spherical_to_cartesian(get_pos_by_coor([x, y]))), int(weights[x, y]*1))
+            pygame.draw.circle(screen, red, cartesian_to_screen(get_pos_by_coor([x, y, z])), int(weights[x, y, z]*2))
     mean_weights = np.mean(weights)
 
     graph = Graph()
-    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1)],dtype=int)
+    randvec = np.random.randint(n, size=2)
+    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1),random.randint(0,0)],dtype=int)
     start = graph.add_node(stcor, None)
     start.gScore = 0
-    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1)],dtype=int)
+    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1),random.randint(0,0)],dtype=int)
 
     end = graph.add_node(stcor, None)
-    pygame.draw.circle(screen, green, cartesian_to_screen(spherical_to_cartesian(start.pos)), 10)
-    pygame.draw.circle(screen, yellow, cartesian_to_screen(spherical_to_cartesian(end.pos)), 10)
+    pygame.draw.circle(screen, green, cartesian_to_screen(start.pos), 10)
+    pygame.draw.circle(screen, yellow, cartesian_to_screen(end.pos), 10)
     graph.prepare(start, end)
     graph.search()
 

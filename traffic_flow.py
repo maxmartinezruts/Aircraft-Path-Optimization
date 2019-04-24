@@ -63,12 +63,14 @@ def get_time(seq):
 # Get total fuel of sequence
 def get_fuel(positions, converted=False):
     if not converted:
+        print('not converted')
         all = np.arange(0,len(positions))
         seq_pos = {}
         for plane in all:
             seq_pos[plane] = positions[plane]
-
+        print(seq_pos)
         seq = list(np.array(sorted(seq_pos.items(), key=lambda kv: kv[1]), dtype=int)[:,0])
+        print(seq)
     else:
         seq = positions
     count = 0
@@ -1107,18 +1109,20 @@ def get_sequence():
     #print('dost',sequence)
     fuels = []
     sequences_fuel = []
-    allplanes = sorted(sequence)
-    print(sequence)
-    sequence_pos = {}
-    for plane in allplanes:
-        sequence_pos[plane] = sequence.index(plane)
-    sequence_pos = list(sequence_pos.values())
-    print(get_fuel(sequence_pos))
-    sequence_pos = optimize.fmin(get_fuel,sequence_pos)
-    sequence_pos = optimize.fmin(get_fuel, sequence_pos)
-    sequence_pos = optimize.fmin(get_fuel, sequence_pos)
-
-    print(get_fuel(sequence_pos))
+    # allplanes = sorted(sequence)
+    # print(sequence)
+    # sequence_pos = {}
+    # for plane in allplanes:
+    #     sequence_pos[plane] = sequence.index(plane)
+    # sequence_pos = list(sequence_pos.values())
+    # print('seqpos', sequence_pos)
+    # print(get_fuel(sequence_pos))
+    # sequence_pos = optimize.fmin(get_fuel,sequence_pos)
+    # sequence_pos = optimize.fmin(get_fuel, sequence_pos)
+    # sequence_pos = optimize.fmin(get_fuel, sequence_pos)
+    #
+    # print(get_fuel(sequence_pos))
+    # print('Sequence',sequence)
 
     # Use the swap approach 10 times and get the best result
     for i in range(1, min(len(sequence),10)):
@@ -1126,7 +1130,7 @@ def get_sequence():
         DP_swap_fuel(i, {}, i, sequence)
 
         # Define fuel consumed of sequence obtained
-        fuels.append(get_fuel(sequence))
+        fuels.append(get_fuel(sequence, True))
         #print('fuel:', get_time(sequence))
 
         # Append sequence
@@ -1305,7 +1309,7 @@ results = []
 sequences= {}
 fuel_total = 0
 get_sequence()
-dt =2
+dt =5
 N = np.zeros((50, 50))
 
 # Game loop
@@ -1447,6 +1451,7 @@ while len(planes) > 0:
 
             # Delete landing aircraft from list, generate new plane and delete aircraft from all frequencies
             del(planes[plane_id])
+            del(sequence)
             if plane_count < len(sizes):
                 generate_plane(plane_count)
             for seq_id in sequences:
