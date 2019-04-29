@@ -3,7 +3,6 @@ import math
 import random
 import pygame
 import time
-from pprint import pprint
 import collections
 
 
@@ -25,19 +24,17 @@ def heuristic_cost_estimate(st, en):
     return  np.linalg.norm(st.pos - en.pos)
 
 def heuristic_cost_estimate_neighbour(st, en):
-    w = (weights[st.coor[0],st.coor[1],st.coor[2]]+weights[en.coor[0],en.coor[1],en.coor[2]])/2
+    w = (weights[st.coor[0],st.coor[1]]+weights[en.coor[0],en.coor[1]])/2
     return  np.linalg.norm(st.pos - en.pos)*w
 
 
 def get_pos_by_coor(coor):
-    return np.array([xValues[coor[0]], yValues[coor[1]], zValues[coor[2]]])
+    return np.array([xValues[coor[0]], yValues[coor[1]]])
 
 def get_coor_by_pos(pos):
     x =int(round((pos[0]-(-8))/(8-(-8))*((n-1))))
     y =int(round((pos[1]-(-8))/(8-(-8))*((n-1))))
-    z =int(round((pos[2]-(0))/(10-(0))*((m-1))))
-
-    coor = np.array([x,y,z], dtype=int)
+    coor = np.array([x,y], dtype=int)
 
     return coor
 
@@ -50,39 +47,37 @@ class Node:
         self.parent = None
 
     def get_neighbors(self):
+
         if self.parent == None:
-            angles = np.linspace(0,0*2*math.pi,1)
-            v3 = np.array([0,0.3,0])
+            angles = np.linspace(0,0*2*math.pi,400)
+            v3 = np.array([0,0.3])
         else:
-            angles =np.linspace(-0.2,0.2,4)
+            angles =np.linspace(-0.2,0.2,20)
             v3 = self.pos - self.parent.pos
 
         neightbours = []
 
         for angle in angles:
-            R = np.array([[np.cos(angle), -np.sin(angle), 0],
-                          [np.sin(angle), np.cos(angle), 0],
-                          [0,0,1]])
+            R = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
             v3rot = np.matmul(R,v3)
             neighbourPos = self.pos + v3rot
 
             neighbourCoor = get_coor_by_pos(neighbourPos)
             if 0 <neighbourCoor[0] <n and 0<neighbourCoor[1]<n:
-
-                node = graph.add_node(neighbourCoor, self)
+                if ( graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]] == 0):
+                    node =graph.add_node(neighbourCoor, self)
+                else:
+                    node = graph.availableCoors[neighbourCoor[0]][neighbourCoor[1]]
 
                 neightbours.append(node)
-
-
         return  neightbours
 
 
 class Graph:
     def __init__(self):
         self.all = []
-        self.availableCoors = [[[0 for j in range(n)] for i in range(n)] for k in range(z)]
-        self.availableCoors = np.zeros((n,n,m), dtype=Node)
-        print(self.availableCoors)
+        self.availableCoors = [[0 for j in range(n)] for i in range(n)]
+
     def prepare(self, start, end):
         print('new')
         self.start = start
@@ -104,12 +99,10 @@ class Graph:
         while len(self.openSet) > 0:  # While not close enough to end
             minScore = math.inf
             for node in self.openSet:
-
-
                 if node.fScore < minScore:
                     minScore = node.fScore
                     current = node
-            # time.sleep(2)
+
             # current = the node in openSet having the lowest fScore[] value
             self.reconstruct_path(self.start, current,green,1)
             #print(current.pos)
@@ -121,9 +114,7 @@ class Graph:
             self.openSet.remove(current)
             self.closedSet.append(current)
             neighbors = current.get_neighbors()
-            print('--------', current.pos)
             for neighbor in neighbors:
-                # print(neighbor.pos)
                 if neighbor in self.closedSet:
                     continue  # Ignore the neighbor which is already evaluated.
 
@@ -141,7 +132,7 @@ class Graph:
 
     def add_node(self, coor, parent):
         node = Node(coor,parent)
-        self.availableCoors[coor[0],coor[1],coor[2]] = node
+        self.availableCoors[coor[0]][coor[1]] = node
         self.all.append(node)
 
         return node
@@ -157,7 +148,6 @@ class Graph:
 
         for p in range(len(path)-1):
             pygame.draw.line(screen, color, cartesian_to_screen(path[p].pos),cartesian_to_screen(path[p+1].pos), w)
-
         pygame.display.flip()
 
         return path
@@ -179,10 +169,10 @@ fpsClock = pygame.time.Clock()
 
 
 fps = 40
-n = 300
-m =3
+n = 200
+m =1000
 # Construct grid
-weights = np.ones((n,n,m))*1
+weights = np.ones((n,n))*1
 # weights += np.random.rand(n,n)*2
 
 mean_weights =  np.mean(weights)
@@ -190,14 +180,13 @@ print(np.mean(weights))
 # weights = np.random.rand(100,100)*5
 xValues = np.linspace(-8,8,n)
 yValues = np.linspace(-8,8,n)
-zValues = np.linspace(0,10,m)
 xx,yy = np.meshgrid(xValues, yValues)
 for x in range(n):
     for y in range(n):
-        for z in range(m):
-            weights[x,y,z] =abs(math.cos(get_pos_by_coor(np.array([x,0,0]))[0])+math.sin(get_pos_by_coor(np.array([0,y,0]))[1]))+1
-            # if 3/8*n < x < 5/8*n and 3/8*n < y < 5/8*n:
-            #     weights[x, y] = 2
+        weights[x,y] =abs(math.sin(get_pos_by_coor(np.array([x,0]))[0])+math.sin(get_pos_by_coor(np.array([0,y]))[1]))+1
+        # if 3/8*n < x < 5/8*n and 3/8*n < y < 5/8*n:
+        # weights[x,y] = 1
+        #     weights[x, y] = 2
 
 # Game loop
 while True:
@@ -205,19 +194,25 @@ while True:
     #
     for x in range(n):
         for y in range(n):
-            pygame.draw.circle(screen, red, cartesian_to_screen(get_pos_by_coor([x, y, z])), int(weights[x, y, z]*2))
-    mean_weights = np.mean(weights)
 
+            brightness = min(255,int(weights[x, y]*100))
+            pygame.draw.circle(screen, (brightness,0,0), cartesian_to_screen(get_pos_by_coor([x, y])), 3)
+            pygame.draw.circle(screen, white, cartesian_to_screen(get_pos_by_coor([x, y])), 0)
+
+    mean_weights = np.mean(weights)
     graph = Graph()
     randvec = np.random.randint(n, size=2)
-    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1),random.randint(0,0)],dtype=int)
+    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1)],dtype=int)
     start = graph.add_node(stcor, None)
     start.gScore = 0
-    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1),random.randint(0,0)],dtype=int)
+    stcor = np.array([random.randint(0,n-1),random.randint(0,n-1)],dtype=int)
 
     end = graph.add_node(stcor, None)
     pygame.draw.circle(screen, green, cartesian_to_screen(start.pos), 10)
     pygame.draw.circle(screen, yellow, cartesian_to_screen(end.pos), 10)
+    pygame.display.flip()
+    # time.sleep(10)
+
     graph.prepare(start, end)
     graph.search()
 
@@ -226,8 +221,9 @@ while True:
 
     print('smth')
     # Draw screen
+
     pygame.display.flip()
-    time.sleep(1)
+    # time.sleep(20)
     fpsClock.tick(fps)
 
 # Close simulation

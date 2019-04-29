@@ -63,14 +63,11 @@ def get_time(seq):
 # Get total fuel of sequence
 def get_fuel(positions, converted=False):
     if not converted:
-        print('not converted')
         all = np.arange(0,len(positions))
         seq_pos = {}
         for plane in all:
             seq_pos[plane] = positions[plane]
-        print(seq_pos)
         seq = list(np.array(sorted(seq_pos.items(), key=lambda kv: kv[1]), dtype=int)[:,0])
-        print(seq)
     else:
         seq = positions
     count = 0
@@ -94,11 +91,9 @@ def get_fuel(positions, converted=False):
         previous_id = plane_id
 
         count += 1
-        pow_by_size= {1:6372261896, 2:35008697169,3:62872901722}
         # Total fuel += time in air * fuel rate
         incr = planes[plane_id].t_exp*planes[plane_id].get_pow()
-        #print(planes[plane_id].size, planes[plane_id].get_pow())
-        #print(incr, planes[plane_id].size)
+
         fuel +=  incr
     return fuel
 
@@ -686,6 +681,92 @@ class Polygon:
         self.clockwise = np.roll(idx, 1)
         self.counterclockwise = np.roll(idx, -1)
 
+class Species:
+    def __init__(self, n_elements, mutation_rate, n_genes):
+        self.n_generation = 0
+        self.elements = []
+        self.mutation_rate = mutation_rate
+        self.n_elements = n_elements
+        self.n_genes = n_genes
+        self.scores = []
+        for i in range(n_elements):
+            self.elements.append(Sequence(n_genes))
+    def pickOne(self):
+        index = 0
+        r = random.random()
+
+        while r >0:
+            r = r- self.elements[index].fitness
+            index +=1
+        index -=1
+
+        element = Sequence(self.n_genes)
+        element.pos_sequence = list(self.elements[index].pos_sequence)
+        element.mutate(self.mutation_rate)
+        return element
+
+
+    def next_generation(self):
+        for i in range(self.n_elements):
+            self.elements[i].normalize()
+        self.calculate_fitness()
+        new_elements = []
+        for i in range(self.n_elements):
+            new_elements.append(self.pickOne())
+        self.elements = new_elements
+
+
+    def calculate_fitness(self):
+        self.scores = []
+        total = 0
+        for i in range(self.n_elements):
+            self.elements[i].get_score()
+            self.scores.append(self.elements[i].score)
+        max_score = max(self.scores)
+
+        for i in range(self.n_elements):
+            total += max_score - self.elements[i].score
+        for i in range(self.n_elements):
+            self.elements[i].get_fitness(total, max_score)
+            # print(i, self.elements[i].fitness)
+
+    def get_status(self):
+
+        fuels = np.array(self.scores)
+        mean = np.mean(fuels)
+        min_fuel = np.min(fuels)
+
+        return mean, min_fuel
+
+
+
+class Sequence:
+    def __init__(self, n_genes):
+        self.score = 0
+        self.fitness = 0
+        self.pos_sequence = list(np.random.rand(n_genes))
+
+    def mutate(self, mutation_rate):
+        for pos in range(len(self.pos_sequence)):
+            if random.random()<mutation_rate:
+                self.pos_sequence[pos] += np.random.randn()
+    def get_fitness(self, total, max_score):
+        self.fitness = (max_score - self.score)/total
+    def get_score(self):
+        self.score = get_fuel(self.pos_sequence)
+    def normalize(self):
+        positions = []
+        for i in range(len(self.pos_sequence)):
+            positions.append(self.pos_sequence[i])
+        positions = np.array(positions)
+        min_pos = np.min(positions)
+        max_pos = np.max(positions)
+        # print(self.pos_sequence)
+        for i in range(len(self.pos_sequence)):
+            self.pos_sequence[i] = (self.pos_sequence[i]-min_pos)/(max_pos-min_pos)
+        # print(self.pos_sequence)
+
+
 class Plane:
     def __init__(self, pos, size, t_gen, p_id):
         self.pos = pos
@@ -1109,20 +1190,31 @@ def get_sequence():
     #print('dost',sequence)
     fuels = []
     sequences_fuel = []
-    # allplanes = sorted(sequence)
-    # print(sequence)
-    # sequence_pos = {}
-    # for plane in allplanes:
-    #     sequence_pos[plane] = sequence.index(plane)
-    # sequence_pos = list(sequence_pos.values())
+    allplanes = sorted(sequence)
+    print(sequence, get_fuel(sequence, True))
+    sequence_pos = {}
+    for plane in allplanes:
+        sequence_pos[plane] = sequence.index(plane)
+    sequence_pos = list(sequence_pos.values())
+    sequence_pos_ga = list(sequence_pos)
     # print('seqpos', sequence_pos)
-    # print(get_fuel(sequence_pos))
     # sequence_pos = optimize.fmin(get_fuel,sequence_pos)
+    # print(sequence_pos)
     # sequence_pos = optimize.fmin(get_fuel, sequence_pos)
     # sequence_pos = optimize.fmin(get_fuel, sequence_pos)
     #
-    # print(get_fuel(sequence_pos))
-    # print('Sequence',sequence)
+    # print('Sequence optimization:',get_fuel(sequence_pos),sequence_pos)
+
+
+
+    # Genetic algorithm approach
+    species = Species(400, 0.01, len(sequence_pos_ga))
+    for i in range(400):
+        species.next_generation()
+        print(species.get_status())
+
+
+
 
     # Use the swap approach 10 times and get the best result
     for i in range(1, min(len(sequence),10)):
@@ -1140,6 +1232,8 @@ def get_sequence():
 
     # Get sequence of minimum time consumed
     sequence = sequences_fuel[fuels.index(min(fuels))]
+    print('Sequence Swap:',get_fuel(sequence, True),sequence)
+
     print(get_fuel(sequence, True))
     sequences['fuel'] = sequence
 
@@ -1349,7 +1443,6 @@ while len(planes) > 0:
         if event.type == QUIT:
             pygame.quit()
             sys.exit()
-
         # When click event
         if event.type == pygame.MOUSEBUTTONDOWN:
 
